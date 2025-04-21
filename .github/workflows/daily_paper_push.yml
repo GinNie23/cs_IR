@@ -1,60 +1,60 @@
 name: push_arxiv_daily
 
 env:
-PYTHON_VERSION: "3.8"  # 这里选择要使用的 Python 版本
-GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}  # GitHub 提供的 Token
+  PYTHON_VERSION: "3.8"  # 这里选择要使用的 Python 版本
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub 提供的 Token
 
 on:
-workflow_dispatch:  # 手动触发工作流
-schedule:
-  - cron: '0 10 * * *'  # 每天 UTC 时间 10:00 触发（上海时间18:00）
+  workflow_dispatch:  # 手动触发工作流
+  schedule:
+    - cron: '0 10 * * *'  # 每天 UTC 时间 10:00 触发（上海时间18:00）
 
 jobs:
-daily-push:
-runs-on: ubuntu-latest
-env:
-SERVERCHAN_API_KEY: ${{secrets.SERVERCHAN_API_KEY}}  # Server 酱 API Token
-CAIYUN_TOKEN: ${{secrets.CAIYUN_TOKEN}}  # 彩云小译 Token
-QUERY: "cs.IR"  # 查询领域（可以修改为 "cs.CL"
-LIMITS: 5  # 每次推送的论文数量
-FEISHU_URL: ${{secrets.FEISHU_URL}}  # 飞书Webhook URL
-DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}  # DeepSeek API Token
-MODEL_TYPE: "DeepSeek"  # 模型类型
+  daily-push:
+    runs-on: ubuntu-latest
+    env:
+      SERVERCHAN_API_KEY: ${{ secrets.SERVERCHAN_API_KEY }}  # Server 酱 API Token
+      CAIYUN_TOKEN: ${{ secrets.CAIYUN_TOKEN }}  # 彩云小译 Token
+      QUERY: "cs.IR"  # 查询领域（可以修改为 "cs.CL"
+      LIMITS: 5  # 每次推送的论文数量
+      FEISHU_URL: ${{ secrets.FEISHU_URL }}  # 飞书 Webhook URL
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}  # DeepSeek API Token
+      MODEL_TYPE: "DeepSeek"  # 模型类型
 
-permissions:
-issues: write
-contents: write
+    permissions:
+      issues: write
+      contents: write
 
-steps:
-  - uses: actions/checkout@v3  # 检出代码
+    steps:
+      - uses: actions/checkout@v3  # 检出代码
 
-  - name: Set up Python version  # 设置 Python 版本
-uses: actions/setup-python@v3
-with:
-  python-version: ${{env.PYTHON_VERSION}}
+      - name: Set up Python version  # 设置 Python 版本
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-  - name: Install dependencies  # 安装依赖库
-run: pip install tqdm requests openai
+      - name: Install dependencies  # 安装依赖库
+        run: pip install tqdm requests openai
 
-  - name: PUSH ARXIV DAILY  # 推送新论文
-run: python arxiv.py  # 指向您的 Python 脚本
+      - name: PUSH ARXIV DAILY  # 推送新论文
+        run: python arxiv.py  # 指向您的 Python 脚本
 
-  - name: Commit files  # 提交更改
-id: commit
-run: |
-  git config --local user.email "action@github.com"
-  git config --local user.name "github-actions"
-  git add --all
-  if [ -z "$(git status --porcelain)" ]; then
-  echo "::set-output name=push::false"
-  else
-git commit -m "chore: update confs" -a
-  echo "::set-output name=push::true"
-  fi
-shell: bash
+      - name: Commit files  # 提交更改
+        id: commit
+        run: |
+          git config --local user.email "action@github.com"  
+          git config --local user.name "github-actions"  
+          git add --all  
+          if [ -z "$(git status --porcelain)" ]; then  
+            echo "::set-output name=push::false"  
+          else  
+            git commit -m "chore: update confs" -a  
+            echo "::set-output name=push::true"  
+          fi
+        shell: bash
 
-  - name: Push changes  # 推送改动
-if: steps.commit.outputs.push == 'true'
-uses: ad-m/github-push-action@master
-with:
-  github_token: ${{secrets.GITHUB_TOKEN}}  # GitHub token
+      - name: Push changes  # 推送改动
+        if: steps.commit.outputs.push == 'true'
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}  # GitHub token
