@@ -1,37 +1,44 @@
+import json
 import requests
-import os
+import xml.etree.ElementTree as ET
 
-def fetch_new_papers(query, limits):
-    url = f"http://export.arxiv.org/api/query?search_query={query}&start=0&max_results={limits}&sortBy=submittedDate&sortOrder=descending"
-    response = requests.get(url)
-    papers = []
+# 函数：获取 ArXiv 论文
+def fetch_arxiv_papers(query, limits):
+    base_url = "http://export.arxiv.org/api/query?"
+    search_query = f"search_query={query}&max_results={limits}"
+    response = requests.get(base_url + search_query)
 
-    # 解析返回的内容
-    entries = response.text.split('<entry>')[1:]
-    for entry in entries:
-        title = entry.split('<title>')[1].split('</title>')[0]
-        link = entry.split('<id>')[1].split('</id>')[0]
-        papers.append({"title": title, "link": link})
+    if response.status_code == 200:
+        return response.text  # 返回获取的论文信息
+    else:
+        raise Exception(f"Error fetching papers from ArXiv: {response.status_code} - {response.text}")
 
-    return papers
-
-def translate_text(text, caiyun_token):
-    url = "https://api.caiyunapp.com/v2/translate"  # 彩云小译 API 地址
-    headers = {
-        "Content-Type": "application/json",
-        "X-Caiyun-Token": caiyun_token  # 彩云小译 Token
-    }
+    # 函数：进行翻译
+def translate_text(source_texts, caiyun_token):
+    url = "http://api.interpreter.caiyunai.com/v1/translator"
 
     payload = {
-        "text": text,
-        "source": "en",  # 源语言
-        "target": "zh"   # 目标语言
+        "source": source_texts,
+        "trans_type": "auto2zh",  # 自动检测源语言并翻译为中文
+        "request_id": "demo",      # 可修改为唯一的 request_id
+        "detect": True,
     }
 
-    response = requests.post(url, headers=headers, json=payload)
-    return response.json()["targetText"]  # 提取翻译后的文本
+    headers = {
+        "content-type": "application/json",
+        "x-authorization": f"token {caiyun_token}",  # 使用传入的 API Token
+    }
 
-def send_message_to_feishu(message, feishu_url):
+    response = requests.post(url, json=payload, headers=headers)
+
+    if response.status_code == 200:
+        return json.loads(response.text)["target"]
+    else:
+        print(f"Error from Caiyun API: {response.status_code} - {response.text}")
+        return None  # 处理错误情况
+
+# 函数：发送消息到飞书
+def send_to_feishu(feishu_url, message):
     payload = {
         "msg_type": "text",
         "content": {
@@ -39,21 +46,3 @@ def send_message_to_feishu(message, feishu_url):
         }
     }
     response = requests.post(feishu_url, json=payload)
-    print("消息发送成功:", response.status_code)
-
-if __name__ == "__main__":
-    QUERY = os.environ.get("QUERY")
-    LIMITS = os.environ.get("LIMITS")
-    FEISHU_URL = os.environ.get("FEISHU_URL")
-    CAIYUN_TOKEN = os.environ.get("CAIYUN_TOKEN")
-
-    # 获取新论文
-    papers = fetch_new_papers(QUERY, LIMITS)
-    message = "今天的新论文:\n"
-    for paper in papers:
-        # 翻译标题
-        translated_title = translate_text(paper['title'], CAIYUN_TOKEN)
-        message += f"* [{translated_title}]({paper['link']})\n"
-
-        # 发送到飞书
-    send_message_to_feishu(message, FEISHU_URL)
